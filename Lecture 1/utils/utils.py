@@ -1,3 +1,13 @@
+from pydantic import validate_arguments
+from utils.modules import Value
+import os
+import graphviz
+from graphviz import Digraph
+import numpy as np
+
+os.environ["PATH"] += os.pathsep + r'C:/Program Files/Graphviz/bin/'
+
+
 def topological_sort(o):
     indegrees = {}
     indegrees[str(id(o))] = 0
@@ -48,3 +58,30 @@ def topological_sort(o):
                     nodes_with_no_incoming_edges.append(neighbor)
 
     return indegrees,nodes_with_no_incoming_edges,outdegree_neighbors,topological_ordering
+
+def trace(root):
+    nodes,edges = set(),set()
+    def build(v):
+        if v not in nodes:
+            nodes.add(v)
+        for i in v._prev:
+            edges.add((v,i,v._op))
+            build(i)
+    build(root)
+    return nodes,edges
+
+@validate_arguments(config = dict(arbitrary_types_allowed = True))
+def build_graph(root:Value):
+    nodes,edges = trace(root)
+    dot = graphviz.Digraph('computation_graph',graph_attr={'rankdir' : 'LR'})
+    for node in nodes:
+        uid = str(id(node))
+        dot.node(uid,label = f"{node.label} | Value = {np.round(node.data,4)} | Grad = {np.round(node.grad,4)}",shape = 'record')
+        if node._op != '':
+            dot.node(uid + f"_{node._op}",label = f"{node._op}")
+            dot.edge(uid + f"_{node._op}",uid)
+    for edge in edges:
+    # required_data = obtain_label(edge)
+    # dot.edge(required_data['child_name'],required_data['parent_name'])
+        dot.edge(str(id(edge[1])),str(id(edge[0])) + f"_{edge[2]}")
+    return dot
